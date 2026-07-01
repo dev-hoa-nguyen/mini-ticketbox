@@ -1,0 +1,27 @@
+// Định nghĩa trạng thái của đơn hàng / lượt giữ vé
+enum OrderStatus {
+  PENDING // Đang chờ thanh toán (Giai đoạn giữ vé 5 phút)
+  COMPLETED // Thanh toán thành công, vé chuyển sang SOLD
+  EXPIRED // Quá 5 phút chưa thanh toán, vé bị nhả ra
+}
+
+model Order {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Quan hệ ngược lại với Ticket
+  ticket Ticket?
+
+  totalAmount Decimal     @db.Decimal(10, 2)
+  status      OrderStatus @default(PENDING)
+
+  // Thời điểm hết hạn giữ vé (Thời gian tạo + 5 phút)
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, expiresAt]) // Quan trọng: Tối ưu cho việc quét và giải phóng các order hết hạn
+  @@map("orders")
+}

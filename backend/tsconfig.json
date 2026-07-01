@@ -1,0 +1,28 @@
+{
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    "outDir": "./dist",
+    "module": "ESNext",
+    "target": "ES2023",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "types": [],
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "paths": {
+      "*": ["./*"],
+      "@generated/*": ["./generated/*"],
+      "@/*": ["./src/*"],
+    },
+  },
+  "tsc-alias": {
+    "resolveFullPaths": true,
+  },
+  "exclude": ["node_modules", "dist", "generated", "src/**/__tests__/**", "**/*.test.ts"],
+}

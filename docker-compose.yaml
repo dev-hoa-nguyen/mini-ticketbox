@@ -1,0 +1,39 @@
+services:
+  # 1. PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ticketbox_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ticketbox
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ticketbox_network
+
+  # 2. Redis Cache & Concurrency Handler
+  redis:
+    image: redis:7-alpine
+    container_name: ticketbox_redis
+    restart: always
+    # command: redis-server --pubsub-node-cache-entries 0 --notify-keyspace-events Ex
+    # Giải thích lệnh trên: Bật tính năng 'Ex' (Expired events) để Redis bắn event khi vé giữ 5 phút bị hết hạn
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ticketbox_network
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  ticketbox_network:
+    driver: bridge

@@ -1,0 +1,24 @@
+config:
+  target: "http://localhost:8080"
+
+  phases:
+    - duration: 5
+      arrivalRate: 100
+      name: "Warm-up phase"
+
+    - duration: 10
+      arrivalRate: 500
+      name: "Spike phase - 5000 requests"
+
+scenarios:
+  - name: "Người dùng giành vé"
+    flow:
+      - post:
+          url: "/api/tickets/hold"
+          json:
+            # Sử dụng trực tiếp built-in variable của Artillery để sinh UUID thật
+            userId: "{{ $uuid }}"
+          expect:
+            - statusCode:
+                - 200
+                - 400

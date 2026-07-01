@@ -1,0 +1,26 @@
+// Định nghĩa trạng thái của từng vé cụ thể
+enum TicketStatus {
+  AVAILABLE // Vé đang trống, có thể đặt
+  HOLD // Vé đang bị giữ trong vòng 5 phút
+  SOLD // Vé đã bán thành công
+}
+
+model Ticket {
+  id     String       @id @default(uuid())
+  code   String       @unique // Mã vé duy nhất, ví dụ: VVIP-001, GA-250
+  price  Decimal      @db.Decimal(10, 2)
+  status TicketStatus @default(AVAILABLE)
+
+  // Quan hệ 1-1 với Order tại một thời điểm: Một vé chỉ nằm trong tối đa một Order đang xử lý/đã mua
+  orderId String? @unique
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Trường version phục vụ cho Optimistic Locking nếu cần dùng làm phương án dự phòng
+  version Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status]) // Tối ưu hóa truy vấn khi tìm kiếm các vé còn trống
+  @@map("tickets")
+}

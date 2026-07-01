@@ -1,0 +1,10 @@
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users") // Đổi tên bảng trong DB thành số nhiều, viết thường
+}
