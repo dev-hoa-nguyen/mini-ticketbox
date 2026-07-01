@@ -7,6 +7,7 @@ import { TicketController } from "./controllers/ticket.controller";
 const router = Router();
 
 // Routes Đặt vé & Thanh toán
+router.get("/tickets/types", TicketController.getTypes);
 router.post("/tickets/hold", TicketController.holdTicket);
 router.post("/tickets/pay", PaymentController.pay);
 

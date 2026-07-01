@@ -233,7 +233,7 @@ export type OrderWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
-  ticket?: Prisma.XOR<Prisma.TicketNullableScalarRelationFilter, Prisma.TicketWhereInput> | null
+  tickets?: Prisma.TicketListRelationFilter
 }
 
 export type OrderOrderByWithRelationInput = {
@@ -245,7 +245,7 @@ export type OrderOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
-  ticket?: Prisma.TicketOrderByWithRelationInput
+  tickets?: Prisma.TicketOrderByRelationAggregateInput
 }
 
 export type OrderWhereUniqueInput = Prisma.AtLeast<{
@@ -260,7 +260,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
-  ticket?: Prisma.XOR<Prisma.TicketNullableScalarRelationFilter, Prisma.TicketWhereInput> | null
+  tickets?: Prisma.TicketListRelationFilter
 }, "id">
 
 export type OrderOrderByWithAggregationInput = {
@@ -299,7 +299,7 @@ export type OrderCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutOrdersInput
-  ticket?: Prisma.TicketCreateNestedOneWithoutOrderInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateInput = {
@@ -310,7 +310,7 @@ export type OrderUncheckedCreateInput = {
   expiresAt: Date | string
   createdAt?: Date | string
   updatedAt?: Date | string
-  ticket?: Prisma.TicketUncheckedCreateNestedOneWithoutOrderInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUpdateInput = {
@@ -321,7 +321,7 @@ export type OrderUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutOrdersNestedInput
-  ticket?: Prisma.TicketUpdateOneWithoutOrderNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateInput = {
@@ -332,7 +332,7 @@ export type OrderUncheckedUpdateInput = {
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  ticket?: Prisma.TicketUncheckedUpdateOneWithoutOrderNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateManyInput = {
@@ -437,20 +437,20 @@ export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
 }
 
-export type OrderCreateNestedOneWithoutTicketInput = {
-  create?: Prisma.XOR<Prisma.OrderCreateWithoutTicketInput, Prisma.OrderUncheckedCreateWithoutTicketInput>
-  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutTicketInput
+export type OrderCreateNestedOneWithoutTicketsInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutTicketsInput, Prisma.OrderUncheckedCreateWithoutTicketsInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutTicketsInput
   connect?: Prisma.OrderWhereUniqueInput
 }
 
-export type OrderUpdateOneWithoutTicketNestedInput = {
-  create?: Prisma.XOR<Prisma.OrderCreateWithoutTicketInput, Prisma.OrderUncheckedCreateWithoutTicketInput>
-  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutTicketInput
-  upsert?: Prisma.OrderUpsertWithoutTicketInput
+export type OrderUpdateOneWithoutTicketsNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutTicketsInput, Prisma.OrderUncheckedCreateWithoutTicketsInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutTicketsInput
+  upsert?: Prisma.OrderUpsertWithoutTicketsInput
   disconnect?: Prisma.OrderWhereInput | boolean
   delete?: Prisma.OrderWhereInput | boolean
   connect?: Prisma.OrderWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutTicketInput, Prisma.OrderUpdateWithoutTicketInput>, Prisma.OrderUncheckedUpdateWithoutTicketInput>
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutTicketsInput, Prisma.OrderUpdateWithoutTicketsInput>, Prisma.OrderUncheckedUpdateWithoutTicketsInput>
 }
 
 export type OrderCreateNestedManyWithoutUserInput = {
@@ -495,7 +495,7 @@ export type OrderUncheckedUpdateManyWithoutUserNestedInput = {
   deleteMany?: Prisma.OrderScalarWhereInput | Prisma.OrderScalarWhereInput[]
 }
 
-export type OrderCreateWithoutTicketInput = {
+export type OrderCreateWithoutTicketsInput = {
   id?: string
   totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.OrderStatus
@@ -505,7 +505,7 @@ export type OrderCreateWithoutTicketInput = {
   user: Prisma.UserCreateNestedOneWithoutOrdersInput
 }
 
-export type OrderUncheckedCreateWithoutTicketInput = {
+export type OrderUncheckedCreateWithoutTicketsInput = {
   id?: string
   userId: string
   totalAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -515,23 +515,23 @@ export type OrderUncheckedCreateWithoutTicketInput = {
   updatedAt?: Date | string
 }
 
-export type OrderCreateOrConnectWithoutTicketInput = {
+export type OrderCreateOrConnectWithoutTicketsInput = {
   where: Prisma.OrderWhereUniqueInput
-  create: Prisma.XOR<Prisma.OrderCreateWithoutTicketInput, Prisma.OrderUncheckedCreateWithoutTicketInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutTicketsInput, Prisma.OrderUncheckedCreateWithoutTicketsInput>
 }
 
-export type OrderUpsertWithoutTicketInput = {
-  update: Prisma.XOR<Prisma.OrderUpdateWithoutTicketInput, Prisma.OrderUncheckedUpdateWithoutTicketInput>
-  create: Prisma.XOR<Prisma.OrderCreateWithoutTicketInput, Prisma.OrderUncheckedCreateWithoutTicketInput>
+export type OrderUpsertWithoutTicketsInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutTicketsInput, Prisma.OrderUncheckedUpdateWithoutTicketsInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutTicketsInput, Prisma.OrderUncheckedCreateWithoutTicketsInput>
   where?: Prisma.OrderWhereInput
 }
 
-export type OrderUpdateToOneWithWhereWithoutTicketInput = {
+export type OrderUpdateToOneWithWhereWithoutTicketsInput = {
   where?: Prisma.OrderWhereInput
-  data: Prisma.XOR<Prisma.OrderUpdateWithoutTicketInput, Prisma.OrderUncheckedUpdateWithoutTicketInput>
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutTicketsInput, Prisma.OrderUncheckedUpdateWithoutTicketsInput>
 }
 
-export type OrderUpdateWithoutTicketInput = {
+export type OrderUpdateWithoutTicketsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
@@ -541,7 +541,7 @@ export type OrderUpdateWithoutTicketInput = {
   user?: Prisma.UserUpdateOneRequiredWithoutOrdersNestedInput
 }
 
-export type OrderUncheckedUpdateWithoutTicketInput = {
+export type OrderUncheckedUpdateWithoutTicketsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   totalAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -558,7 +558,7 @@ export type OrderCreateWithoutUserInput = {
   expiresAt: Date | string
   createdAt?: Date | string
   updatedAt?: Date | string
-  ticket?: Prisma.TicketCreateNestedOneWithoutOrderInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutUserInput = {
@@ -568,7 +568,7 @@ export type OrderUncheckedCreateWithoutUserInput = {
   expiresAt: Date | string
   createdAt?: Date | string
   updatedAt?: Date | string
-  ticket?: Prisma.TicketUncheckedCreateNestedOneWithoutOrderInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutUserInput = {
@@ -626,7 +626,7 @@ export type OrderUpdateWithoutUserInput = {
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  ticket?: Prisma.TicketUpdateOneWithoutOrderNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutUserInput = {
@@ -636,7 +636,7 @@ export type OrderUncheckedUpdateWithoutUserInput = {
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  ticket?: Prisma.TicketUncheckedUpdateOneWithoutOrderNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutUserInput = {
@@ -649,6 +649,35 @@ export type OrderUncheckedUpdateManyWithoutUserInput = {
 }
 
 
+/**
+ * Count Type OrderCountOutputType
+ */
+
+export type OrderCountOutputType = {
+  tickets: number
+}
+
+export type OrderCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  tickets?: boolean | OrderCountOutputTypeCountTicketsArgs
+}
+
+/**
+ * OrderCountOutputType without action
+ */
+export type OrderCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OrderCountOutputType
+   */
+  select?: Prisma.OrderCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * OrderCountOutputType without action
+ */
+export type OrderCountOutputTypeCountTicketsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TicketWhereInput
+}
+
 
 export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -659,7 +688,8 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  ticket?: boolean | Prisma.Order$ticketArgs<ExtArgs>
+  tickets?: boolean | Prisma.Order$ticketsArgs<ExtArgs>
+  _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["order"]>
 
 export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -697,7 +727,8 @@ export type OrderSelectScalar = {
 export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "totalAmount" | "status" | "expiresAt" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
-  ticket?: boolean | Prisma.Order$ticketArgs<ExtArgs>
+  tickets?: boolean | Prisma.Order$ticketsArgs<ExtArgs>
+  _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -710,7 +741,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   name: "Order"
   objects: {
     user: Prisma.$UserPayload<ExtArgs>
-    ticket: Prisma.$TicketPayload<ExtArgs> | null
+    tickets: Prisma.$TicketPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1115,7 +1146,7 @@ readonly fields: OrderFieldRefs;
 export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-  ticket<T extends Prisma.Order$ticketArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$ticketArgs<ExtArgs>>): Prisma.Prisma__TicketClient<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  tickets<T extends Prisma.Order$ticketsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$ticketsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1553,9 +1584,9 @@ export type OrderDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Interna
 }
 
 /**
- * Order.ticket
+ * Order.tickets
  */
-export type Order$ticketArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type Order$ticketsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
    * Select specific fields to fetch from the Ticket
    */
@@ -1569,6 +1600,11 @@ export type Order$ticketArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
    */
   include?: Prisma.TicketInclude<ExtArgs> | null
   where?: Prisma.TicketWhereInput
+  orderBy?: Prisma.TicketOrderByWithRelationInput | Prisma.TicketOrderByWithRelationInput[]
+  cursor?: Prisma.TicketWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TicketScalarFieldEnum | Prisma.TicketScalarFieldEnum[]
 }
 
 /**

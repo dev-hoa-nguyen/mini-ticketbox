@@ -1,4 +1,4 @@
--- KEYS[1]: Key chứa Set các vé trống (VD: "tickets:available")
+-- KEYS[1]: Key chứa Set vé trống của MỘT loại vé (VD: "tickets:available:TIER S - ZONE A")
 -- ARGV[1]: userId (ID của người dùng đang đặt vé)
 -- ARGV[2]: ttl (Thời gian giữ vé tính bằng giây, VD: "300")
 -- ARGV[3]: Prefix của hold key (VD: "ticket:hold:")

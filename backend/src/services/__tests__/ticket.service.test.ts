@@ -2,98 +2,127 @@ import { jest } from "@jest/globals";
 
 // ESM: jest.mock KHÔNG được hoist như CommonJS.
 // Phải dùng unstable_mockModule + dynamic import() sau khi mock.
-const mockHoldTicketAtomic = jest.fn();
-const mockDel = jest.fn();
-const mockSadd = jest.fn();
+const mockHoldCartAtomic = jest.fn();
+const mockUpsert = jest.fn();
 const mockTransaction = jest.fn();
 
-const REDIS_KEYS = {
-  AVAILABLE_TICKETS: "tickets:available",
-  HOLD_PREFIX: "ticket:hold:",
-};
-
-// Mock module Redis (đường dẫn alias phải khớp với source: @/database/redis)
-jest.unstable_mockModule("@/database/redis", () => ({
-  redis: {
-    holdTicketAtomic: mockHoldTicketAtomic,
-    defineCommand: jest.fn(), // ticket.service gọi lúc load module
-    del: mockDel,
-    sadd: mockSadd,
-  },
-  REDIS_KEYS,
+const mockPipelineSadd = jest.fn();
+const mockPipelineDel = jest.fn();
+const mockPipelineExec = jest.fn();
+const mockPipeline = jest.fn(() => ({
+  sadd: mockPipelineSadd,
+  del: mockPipelineDel,
+  exec: mockPipelineExec,
 }));
 
-// Mock module Prisma
+const REDIS_KEYS = {
+  HOLD_PREFIX: "ticket:hold:",
+  TYPES_SET: "tickets:types",
+  availableByType: (type: string) => `tickets:available:${type}`,
+};
+
+jest.unstable_mockModule("@/database/redis", () => ({
+  redis: {
+    holdCartAtomic: mockHoldCartAtomic,
+    defineCommand: jest.fn(), // ticket.service gọi lúc load module
+    pipeline: mockPipeline,
+  },
+  REDIS_KEYS,
+  getAvailabilityByType: jest.fn(),
+}));
+
 jest.unstable_mockModule("@/database/prisma", () => ({
   prisma: {
+    user: { upsert: mockUpsert },
     $transaction: mockTransaction,
   },
 }));
 
-// Import động SAU khi đã đăng ký mock
 const { TicketService } = await import("../ticket.service");
 
-describe("TicketService.holdTicket", () => {
-  const mockUserId = "test-user-uuid";
-  const mockTicketId = "TICKET-001";
+describe("TicketService.holdCart", () => {
+  const email = "buyer@example.com";
+  const userId = "user-uuid-1";
+  const typeA = "TIER S - ZONE A";
+
+  beforeEach(() => {
+    mockUpsert.mockResolvedValue({ id: userId, email, name: "buyer" });
+  });
 
   afterEach(() => {
-    jest.clearAllMocks(); // Xóa lịch sử gọi hàm sau mỗi test case
+    jest.clearAllMocks();
   });
 
-  it("Trường hợp 1: Giữ vé thành công khi Redis còn vé và DB hoạt động tốt", async () => {
-    // Giả lập Redis báo thành công (status = 1) và trả về ticketId
-    mockHoldTicketAtomic.mockResolvedValue([1, mockTicketId]);
-
-    // Giả lập DB lưu thành công
-    const mockDbResult = {
+  it("Giữ giỏ vé thành công: gọi Lua đúng tham số & trả data từ DB", async () => {
+    mockHoldCartAtomic.mockResolvedValue([1, ["t1", "t2"]]);
+    const dbResult = {
       order: { id: "order-1" },
-      ticket: { id: mockTicketId },
+      tickets: [{ id: "t1" }, { id: "t2" }],
     };
-    mockTransaction.mockResolvedValue(mockDbResult);
+    mockTransaction.mockResolvedValue(dbResult);
 
-    const result = await TicketService.holdTicket(mockUserId);
+    const result = await TicketService.holdCart({
+      email,
+      items: [{ type: typeA, quantity: 2 }],
+    });
 
-    expect(mockHoldTicketAtomic).toHaveBeenCalledWith(
-      REDIS_KEYS.AVAILABLE_TICKETS,
-      mockUserId,
+    // numKeys, ...keys, userId, ttl, holdPrefix, ...quantities
+    expect(mockHoldCartAtomic).toHaveBeenCalledWith(
+      1,
+      REDIS_KEYS.availableByType(typeA),
+      userId,
       "300",
       REDIS_KEYS.HOLD_PREFIX,
+      "2",
     );
-    expect(mockTransaction).toHaveBeenCalled();
     expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockDbResult);
+    expect(result.data).toEqual(dbResult);
   });
 
-  it("Trường hợp 2: Báo lỗi khi Redis hết vé (status = 0)", async () => {
-    // Giả lập Redis báo hết vé
-    mockHoldTicketAtomic.mockResolvedValue([0, null]);
+  it("All-or-nothing: 1 loại không đủ -> ném lỗi 409, KHÔNG ghi DB", async () => {
+    // status=0, index=1 (loại đầu), còn 3 vé
+    mockHoldCartAtomic.mockResolvedValue([0, 1, 3]);
 
-    await expect(TicketService.holdTicket(mockUserId)).rejects.toThrow(
-      "Hết vé hoặc hệ thống đang bận, vui lòng thử lại!",
-    );
+    await expect(
+      TicketService.holdCart({
+        email,
+        items: [{ type: typeA, quantity: 5 }],
+      }),
+    ).rejects.toThrow(`Loại vé "${typeA}" chỉ còn 3 vé`);
 
-    // Đảm bảo không gọi xuống DB nếu RAM đã báo hết vé
     expect(mockTransaction).not.toHaveBeenCalled();
   });
 
-  it("Trường hợp 3: Rollback Redis (nhả vé) nếu Database lưu thất bại", async () => {
-    mockHoldTicketAtomic.mockResolvedValue([1, mockTicketId]);
-
-    // Giả lập DB bị lỗi (rớt mạng, crash...)
+  it("Rollback Redis (trả vé về đúng loại) nếu ghi DB thất bại", async () => {
+    mockHoldCartAtomic.mockResolvedValue([1, ["t1", "t2"]]);
     mockTransaction.mockRejectedValue(new Error("DB Connection Lost"));
 
-    await expect(TicketService.holdTicket(mockUserId)).rejects.toThrow(
-      "Có lỗi xảy ra khi tạo đơn hàng, đã hoàn tác giữ vé.",
-    );
+    await expect(
+      TicketService.holdCart({
+        email,
+        items: [{ type: typeA, quantity: 2 }],
+      }),
+    ).rejects.toThrow("đã hoàn tác giữ vé");
 
-    // Kiểm tra xem cơ chế Rollback (Compensating Transaction) có được gọi không
-    expect(mockDel).toHaveBeenCalledWith(
-      `${REDIS_KEYS.HOLD_PREFIX}${mockTicketId}`,
+    // Trả 2 vé về set theo loại + xoá 2 hold key
+    expect(mockPipelineSadd).toHaveBeenCalledWith(
+      REDIS_KEYS.availableByType(typeA),
+      "t1",
+      "t2",
     );
-    expect(mockSadd).toHaveBeenCalledWith(
-      REDIS_KEYS.AVAILABLE_TICKETS,
-      mockTicketId,
-    );
+    expect(mockPipelineDel).toHaveBeenCalledWith(`${REDIS_KEYS.HOLD_PREFIX}t1`);
+    expect(mockPipelineDel).toHaveBeenCalledWith(`${REDIS_KEYS.HOLD_PREFIX}t2`);
+    expect(mockPipelineExec).toHaveBeenCalled();
+  });
+
+  it("Chặn mua quá giới hạn mỗi đơn (tổng > 10 vé)", async () => {
+    await expect(
+      TicketService.holdCart({
+        email,
+        items: [{ type: typeA, quantity: 11 }],
+      }),
+    ).rejects.toThrow("tối đa 10 vé");
+
+    expect(mockHoldCartAtomic).not.toHaveBeenCalled();
   });
 });

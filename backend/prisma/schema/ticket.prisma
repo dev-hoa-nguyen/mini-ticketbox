@@ -10,9 +10,10 @@ model Ticket {
   code   String       @unique // Mã vé duy nhất, ví dụ: VVIP-001, GA-250
   price  Decimal      @db.Decimal(10, 2)
   status TicketStatus @default(AVAILABLE)
+  type   String       @default("")
 
-  // Quan hệ 1-1 với Order tại một thời điểm: Một vé chỉ nằm trong tối đa một Order đang xử lý/đã mua
-  orderId String? @unique
+  // Quan hệ N-1 với Order: một Order (giỏ vé) có thể chứa nhiều vé thuộc nhiều loại.
+  orderId String?
   order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   // Trường version phục vụ cho Optimistic Locking nếu cần dùng làm phương án dự phòng
@@ -22,5 +23,6 @@ model Ticket {
   updatedAt DateTime @updatedAt
 
   @@index([status]) // Tối ưu hóa truy vấn khi tìm kiếm các vé còn trống
+  @@index([orderId]) // Truy vấn nhanh toàn bộ vé thuộc một Order (giỏ vé)
   @@map("tickets")
 }

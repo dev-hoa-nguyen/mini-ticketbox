@@ -13,17 +13,23 @@ async function main() {
 
   // 2. Chuẩn bị mảng 500 vé
   const TOTAL_TICKETS = 500;
-  const TICKET_PRICE = 1500000; // Ví dụ: 1.500.000 VNĐ
+  const TICKET_PRICE = 750000;
 
   // Tạo mảng data chứa 500 object vé
-  const ticketsData = Array.from({ length: TOTAL_TICKETS }).map((_, index) => {
-    // Format mã vé: TICKET-001, TICKET-002,... TICKET-500
-    const ticketNumber = (index + 1).toString().padStart(3, "0");
+  const ticketsData = Array.from({ length: TOTAL_TICKETS }).map((_, idx) => {
+    const ticketNumber = Math.random()
+      .toString(36)
+      .substring(2, 10)
+      .toUpperCase();
+
+    const ticketType = idx % 2 === 0 ? "TIER S - ZONE A" : "TIER A - ZONE B";
+    const ticketPrice = idx % 2 === 0 ? TICKET_PRICE * 2 : TICKET_PRICE;
 
     return {
       code: `TICKET-${ticketNumber}`,
-      price: TICKET_PRICE,
+      price: ticketPrice,
       status: TicketStatus.AVAILABLE, // Mặc định là vé trống
+      type: ticketType,
       version: 0,
     };
   });
@@ -42,7 +48,7 @@ async function main() {
   const testUser = await prisma.user.create({
     data: {
       email: "testuser@ticketbox.mini",
-      name: "Test User",
+      name: "User",
     },
   });
 

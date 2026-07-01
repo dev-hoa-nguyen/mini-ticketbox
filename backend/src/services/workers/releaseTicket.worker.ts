@@ -36,52 +36,56 @@ export class ReleaseTicketWorker {
 
   private static async handleReleaseTicket(ticketId: string) {
     try {
-      // 1. Dùng Transaction để cập nhật DB một cách an toàn
-      const dbResult = await prisma.$transaction(async (tx) => {
-        // Tìm vé đang bị giữ
-        const ticket = await tx.ticket.findUnique({
-          where: { id: ticketId },
-        });
+      // 1. Transaction: hết hạn CẢ đơn (giỏ vé) và nhả TOÀN BỘ vé của đơn đó.
+      // Vé trong 1 giỏ có cùng TTL nên hết hạn gần như đồng thời; ta xử lý trọn
+      // đơn ngay ở sự kiện đầu tiên -> tránh trạng thái nửa vời.
+      const releasedTickets = await prisma.$transaction(async (tx) => {
+        const ticket = await tx.ticket.findUnique({ where: { id: ticketId } });
 
         if (!ticket || ticket.status !== TicketStatus.HOLD || !ticket.orderId) {
-          // Vé có thể đã được thanh toán thành công (status = SOLD), bỏ qua
+          // Vé đã SOLD (thanh toán xong) hoặc đã được xử lý -> bỏ qua.
           return null;
         }
 
-        // Kiểm tra đơn hàng hiện tại
         const order = await tx.order.findUnique({
           where: { id: ticket.orderId },
         });
-
         if (!order || order.status !== OrderStatus.PENDING) {
           return null;
         }
 
-        // Cập nhật DB: Hủy đơn hàng và nhả vé
+        // Lấy toàn bộ vé của đơn TRƯỚC khi cắt quan hệ (để biết loại mà trả về kho)
+        const siblings = await tx.ticket.findMany({
+          where: { orderId: order.id },
+        });
+
         await tx.order.update({
           where: { id: order.id },
           data: { status: OrderStatus.EXPIRED },
         });
 
-        const releasedTicket = await tx.ticket.update({
-          where: { id: ticketId },
-          data: {
-            status: TicketStatus.AVAILABLE,
-            orderId: null, // Cắt đứt quan hệ với đơn hàng cũ
-          },
+        await tx.ticket.updateMany({
+          where: { orderId: order.id },
+          data: { status: TicketStatus.AVAILABLE, orderId: null },
         });
 
-        return releasedTicket;
+        return siblings;
       });
 
-      // 2. Nếu DB xử lý thành công, đẩy vé trở lại Set "tickets:available" trên Redis
-      if (dbResult) {
-        await redis.sadd(REDIS_KEYS.AVAILABLE_TICKETS, ticketId);
-        console.log(
-          `✅ [RELEASED] Đã trả vé ${ticketId} về lại kho trống thành công.`,
-        );
+      // 2. Trả toàn bộ vé về đúng Set theo loại + dọn các hold key anh em còn lại.
+      if (releasedTickets && releasedTickets.length > 0) {
+        const pipeline = redis.pipeline();
+        for (const ticket of releasedTickets) {
+          pipeline.sadd(REDIS_KEYS.availableByType(ticket.type), ticket.id);
+          pipeline.sadd(REDIS_KEYS.TYPES_SET, ticket.type);
+          // Xoá hold key anh em để sự kiện expired của chúng không lặp lại vô ích.
+          pipeline.del(`${REDIS_KEYS.HOLD_PREFIX}${ticket.id}`);
+        }
+        await pipeline.exec();
 
-        // TODO: (Sau này) Bắn sự kiện SSE để Frontend cập nhật số lượng vé tăng lên
+        console.log(
+          `✅ [RELEASED] Đã nhả ${releasedTickets.length} vé của đơn hết hạn về lại kho.`,
+        );
       }
     } catch (error) {
       console.error(`🔴 Lỗi khi nhả vé ${ticketId}:`, error);

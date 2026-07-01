@@ -10,8 +10,8 @@ model Order {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Quan hệ ngược lại với Ticket
-  ticket Ticket?
+  // Quan hệ ngược lại với Ticket: 1 Order chứa nhiều vé (giỏ vé nhiều loại)
+  tickets Ticket[]
 
   totalAmount Decimal     @db.Decimal(10, 2)
   status      OrderStatus @default(PENDING)
