@@ -2,6 +2,14 @@ import { prisma } from "src/database/prisma";
 import { TicketStatus } from "../generated/client";
 
 async function main() {
+  // Idempotent: nếu đã có vé (VD chạy lại `docker compose up`), bỏ qua để không
+  // xoá dữ liệu đang chạy. Muốn seed lại từ đầu: xoá volume DB rồi chạy lại.
+  const existing = await prisma.ticket.count();
+  if (existing > 0) {
+    console.log(`✅ DB đã có ${existing} vé, bỏ qua seed.`);
+    return;
+  }
+
   console.log("Bắt đầu quá trình dọn dẹp và seed dữ liệu...");
 
   // 1. Dọn dẹp dữ liệu cũ (Xóa theo thứ tự để tránh lỗi khóa ngoại)

@@ -1,52 +1,23 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1
+FROM node:22-slim
 
-################################
-# Base: node + pnpm (corepack)
-################################
-FROM node:24-alpine AS base
+# openssl cần cho Prisma
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
+
 WORKDIR /app
 
-################################
-# deps: full deps (dev+prod), cached qua lockfile
-################################
-FROM base AS deps
+# Cài full deps (giữ tsx để seed, tsc/tsc-alias để build)
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
-################################
-# build: generate prisma client + compile TS -> dist
-################################
-FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source, sinh Prisma Client, build TS -> dist
+# (DATABASE_URL giả chỉ để prisma generate không lỗi lúc build; runtime dùng env thật)
 COPY . .
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db?schema=public"
-RUN pnpm db:generate
-RUN pnpm build
+RUN pnpm db:generate && pnpm build
 
-################################
-# prod-deps: chỉ dependencies production (prisma client dùng driver adapter,
-# không sinh engine binary, compiled sẵn trong dist/generated)
-################################
-FROM base AS prod-deps
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --prod --no-optional --frozen-lockfile
-
-################################
-# runtime: image cuối, không dev deps, không source TS
-################################
-FROM node:24-alpine AS runtime
-ENV NODE_ENV=production
-WORKDIR /app
-
-RUN addgroup -S nodejs && adduser -S nodejs -G nodejs
-
-COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/package.json ./package.json
-
-USER nodejs
 EXPOSE 8080
-CMD ["node", "dist/src/server.js"]
+
+# migrate + seed (idempotent) + start
+CMD ["sh", "docker-entrypoint.sh"]

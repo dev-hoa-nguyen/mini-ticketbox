@@ -1,33 +1,93 @@
 services:
-  # 1. PostgreSQL Database
+  # 1. PostgreSQL
   postgres:
     image: postgres:15-alpine
     container_name: ticketbox_postgres
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ticketbox
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ticketbox}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ticketbox}",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 15
     networks:
       - ticketbox_network
 
-  # 2. Redis Cache & Concurrency Handler
+  # 2. Redis (kho vé + keyspace notifications tự nhả vé)
   redis:
     image: redis:7-alpine
     container_name: ticketbox_redis
     restart: always
-    # command: redis-server --pubsub-node-cache-entries 0 --notify-keyspace-events Ex
-    # Giải thích lệnh trên: Bật tính năng 'Ex' (Expired events) để Redis bắn event khi vé giữ 5 phút bị hết hạn
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
     networks:
       - ticketbox_network
+
+  # 3. Backend API — tự migrate + seed (idempotent) rồi khởi động
+  backend:
+    build: ./backend
+    container_name: ticketbox_backend
+    restart: always
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 8080
+      JWT_SECRET: ${JWT_SECRET:-super-secret-change-me}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ticketbox}?schema=public
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - ticketbox_network
+
+  # 4. Frontend (TanStack Start SSR)
+  frontend:
+    build: ./frontend
+    container_name: ticketbox_frontend
+    restart: always
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api}
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - ticketbox_network
+
 volumes:
   postgres_data:
     driver: local
