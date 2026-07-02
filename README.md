@@ -1,7 +1,8 @@
-# 🎟️ Mini Ticketbox — Hệ thống đặt vé Concert chịu tải cao
+# 🎟️ Mini Ticketbox
 
 > **Tác giả:** _Nguyễn Thanh Hòa_
-> Bài test Fullstack — xây dựng hệ thống bán vé giới hạn **500 vé** cho sự kiện có
+>
+> Bài test Fullstack — Xây dựng hệ thống bán vé giới hạn **500 vé** cho sự kiện có
 > thể lên tới **~5.000 người dùng đồng thời** tranh vé, F5 liên tục. Trọng tâm:
 > **chống bán quá số lượng (over-selling)** ở backend và **trải nghiệm mượt dưới
 > tải cao** ở frontend.
@@ -160,7 +161,7 @@ mini-ticketbox/
 - **Trang Admin**: thống kê vé (trống/đang giữ/đã bán), doanh thu, và **bóc tách theo từng loại vé**;
   tự làm mới mỗi 3s.
 
-## 6. Chạy dự án — chỉ **một lệnh** với Docker
+## 6. Chạy dự án với Docker
 
 Yêu cầu duy nhất: **Docker** (kèm Docker Compose v2).
 
@@ -261,3 +262,96 @@ cd frontend && npx vitest run  # Vitest — khôi phục phiên giữ vé sau F5
 - Keyspace notification được bật bằng code lúc khởi động backend nên **không cần** cấu hình thêm trên Redis.
 - Backend khi khởi động luôn **đồng bộ lại các Set vé trống** từ DB lên Redis, nên restart là an toàn.
 - Frontend chạy ở chế độ dev-server (Vite) trong container để phục vụ ổn định cả SSR lẫn client.
+
+## 11. Cần cải thiện & Tính năng mở rộng
+
+> Để có thể đưa hệ thống từ **bài test** lên **production-ready**, ta cần cải thiện và phát triển thêm các hạng mục sau:
+
+### 1. Bảo mật (Security) 🔒
+
+| Hạng mục                  | Hiện trạng                                                                       | Đề xuất                                                                                            |
+| ------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Xác thực & phân quyền** | Không có — ai cũng truy cập được `/api/admin/stats` và thanh toán bất kỳ đơn nào | Thêm JWT middleware; bảo vệ route admin; xác minh quyền sở hữu đơn hàng khi thanh toán             |
+| **Rate Limiting**         | Không có — một user có thể spam `/api/tickets/hold` liên tục                     | Thêm `express-rate-limit` hoặc Redis-based rate limiter (sliding window) cho các endpoint nhạy cảm |
+| **Security Headers**      | Không dùng `helmet()`                                                            | Thêm middleware Helmet để thiết lập X-Content-Type-Options, X-Frame-Options, CSP, v.v.             |
+| **CORS**                  | Không cấu hình rõ ràng                                                           | Thêm `cors()` whitelist domain frontend cụ thể                                                     |
+| **Idempotency Key**       | Không có — request retry (mất mạng) có thể tạo trùng đơn                         | Hỗ trợ header `Idempotency-Key` cho các endpoint mutating                                          |
+| **Xác minh đơn hàng**     | `POST /pay` chỉ kiểm `orderId`, ai biết UUID đều thanh toán được                 | Liên kết đơn với user (email/token) và xác minh quyền sở hữu                                       |
+
+### 2. Khả năng mở rộng (Scalability) 📈
+
+| Hạng mục                   | Hiện trạng                                                                                  | Đề xuất                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Multi-instance**         | Redis Keyspace `SUBSCRIBE` chỉ 1 instance nhận event → chạy nhiều pod sẽ bị trùng/mất event | Dùng **BullMQ** (delayed job) thay cho keyspace notification, hoặc dùng Redis Stream + consumer group |
+| **SSE backpressure**       | Mỗi client → 1 `SCARD`/2s. 5.000 client = 2.500 call/s chỉ để stream                        | Cache kết quả `SCARD` tập trung (1 interval broadcast), dùng pub/sub fan-out hoặc WebSocket room      |
+| **Connection pooling**     | Redis client dùng cấu hình mặc định                                                         | Cấu hình `maxRetriesPerRequest`, `retryStrategy`, pool size cho ioredis                               |
+| **Reconciliation job**     | Nếu worker bị ngắt kết nối lúc key expired → vé kẹt HOLD mãi mãi                            | Thêm cronjob quét `orders WHERE status='PENDING' AND expiresAt < NOW()` để dọn vé bị kẹt              |
+| **Prisma connection pool** | Dùng cấu hình connection pool mặc định                                                      | Tuning `connection_limit` cho Prisma phù hợp với spike traffic 5.000 concurrent users                 |
+
+### 3. Hệ thống giám sát (Observability) 🔍
+
+- **Structured Logging**: Thay `console.log` bằng **Pino** hoặc **Winston** — có log level, timestamp, request correlation ID.
+- **Request Tracing**: Gắn `X-Request-Id` cho mỗi request, truyền xuyên suốt service → dễ debug trong production.
+- **Metrics & Monitoring**: Thu thập Prometheus metrics (request duration, ticket hold/pay rate, error rate) + Grafana dashboard.
+- **Health check nâng cao**: Endpoint `/health` hiện chỉ trả `{ status: "ok" }` — nên kiểm tra cả kết nối Redis và PostgreSQL (readiness probe).
+- **Dead Letter Queue**: Log lại các thao tác thất bại (DB write sau Redis hold) vào DLQ để retry hoặc alert.
+
+### 4. Giao diện & Trải nghiệm người dùng (Frontend UX) 🎨
+
+| Hạng mục                   | Đề xuất                                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Responsive / Mobile**    | Layout POS hiện dùng `grid-cols-[1fr_420px]` — cần breakpoint cho tablet/mobile (stack dọc, bottom sheet cho giỏ vé) |
+| **SEO & Meta tags**        | Tiêu đề vẫn là "TanStack Start Starter", thiếu meta description/OG tags                                              | Thêm `<title>`, `<meta description>`, Open Graph cho từng route; cập nhật `manifest.json` |
+| **Empty / Sold-out State** | Không có màn hình "Hết vé" riêng — thiết kế trang sold-out chuyên biệt với CTA phù hợp                               |
+| **Error Boundary**         | Không có React Error Boundary — crash component sẽ trắng toàn trang → bọc ErrorBoundary có fallback UI               |
+| **Dark Mode toggle**       | CSS variables cho `.dark` đã sẵn sàng nhưng chưa có nút chuyển đổi                                                   | Thêm UI toggle dark/light trên Header                                                     |
+| **Page Transitions**       | Chuyển trang tức thì, không animation — áp dụng View Transitions API hoặc Framer Motion                              |
+| **Cảnh báo rời trang**     | User có thể navigate khỏi checkout không cảnh báo — thêm `beforeunload` + `useBlocker`                               |
+| **Offline indicator**      | Không phát hiện mất mạng — thêm banner "Mất kết nối" khi offline                                                     |
+| **Code splitting**         | Tất cả route load cùng lúc — dùng `lazy()` trên route definition để tách bundle                                      |
+| **Multi-tab sync**         | Mở nhiều tab có thể gây xung đột (1 tab thanh toán, tab khác vẫn hiện bước giữ)                                      | Dùng `BroadcastChannel` hoặc `storage` event để đồng bộ state giữa các tab                |
+| **Tách component lớn**     | `TicketCart` (394 dòng) quá lớn, khó bảo trì                                                                         | Tách thành `TicketTypeCard`, `CartSidebar`, `MobileBottomBar`                             |
+
+### 5. Accessibility (a11y) ♿
+
+- **ARIA labels**: Thêm `aria-label` cho các nút tương tác, input, và các phần tử icon-only.
+- **Keyboard navigation**: Đảm bảo toàn bộ luồng đặt vé có thể thao tác bằng bàn phím (Tab, Enter, Escape).
+- **Focus management**: Quản lý focus khi mở/đóng dialog, chuyển bước trong checkout.
+- **`aria-live` region**: Số vé real-time (SSE) cần `aria-live="polite"` để screen reader thông báo thay đổi.
+- **Skip-to-content link**: Thêm link "Bỏ qua menu" cho người dùng screen reader.
+- **Color contrast**: Kiểm tra WCAG AA cho gradient text, badge, và các phần tử nhỏ.
+
+### 6. Kiểm thử (Testing) 🧪
+
+| Loại                | Hiện trạng                                    | Đề xuất                                                                                     |
+| ------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **Unit (Backend)**  | 4 test case cho logic giữ vé — ✅ tốt         | Bổ sung test cho `PaymentService`, `AdminService`, worker, Zod schema, controller           |
+| **Unit (Frontend)** | 1 file test (`CheckoutFlow.test.tsx`, 3 case) | Thêm test cho `useCountdown`, `useTicketStream`, `TicketCart`, API client, format utilities |
+| **Integration**     | Không có — tất cả mock Redis/Prisma           | Viết integration test chạy với real Redis + PostgreSQL (testcontainers)                     |
+| **E2E**             | Không có                                      | Thêm Playwright/Cypress cho luồng đặt vé end-to-end (chọn → giữ → thanh toán → hết hạn)     |
+| **Lua Script**      | Chỉ test gián tiếp qua service mock           | Test trực tiếp Lua script với Redis thật                                                    |
+
+### 7. Tính năng đề xuất 🚀
+
+| Tính năng                  | Mô tả                                                                            | Độ ưu tiên    |
+| -------------------------- | -------------------------------------------------------------------------------- | ------------- |
+| **Huỷ đơn chủ động**       | User có thể tự huỷ đơn đang giữ (nhả vé ngay) thay vì chờ hết 5 phút             | 🔴 Cao        |
+| **Tra cứu đơn hàng**       | Endpoint + UI tra cứu đơn theo email hoặc mã đơn — xem trạng thái, chi tiết vé   | 🔴 Cao        |
+| **Email xác nhận**         | Gửi email xác nhận khi thanh toán thành công (Nodemailer/Resend)                 | 🔴 Cao        |
+| **Vé điện tử (QR Code)**   | Sinh QR code hoặc PDF vé sau thanh toán — user có thể tải/in                     | 🟡 Trung bình |
+| **Hàng chờ (Queue)**       | Khi vé hết, user vào waiting list — nếu có vé nhả sẽ thông báo                   | 🟡 Trung bình |
+| **Quản lý sự kiện (CRUD)** | Admin tạo/sửa/xoá sự kiện, loại vé, giá — hiện hardcode trong seed               | 🟡 Trung bình |
+| **Thanh toán thật**        | Tích hợp cổng thanh toán (Stripe, VNPay, MoMo) thay cho giả lập                  | 🟡 Trung bình |
+| **Đa ngôn ngữ (i18n)**     | Hỗ trợ tiếng Anh bên cạnh tiếng Việt — dùng `react-intl` hoặc `next-intl`        | 🟢 Thấp       |
+| **PWA**                    | Service Worker + Web App Manifest — cho phép "Add to Home Screen", cache offline | 🟢 Thấp       |
+| **API Documentation**      | Tự sinh OpenAPI/Swagger từ Zod schema — developer-friendly                       | 🟢 Thấp       |
+| **Sơ đồ chỗ ngồi**         | UI chọn ghế trên sơ đồ (seat map) thay vì chỉ chọn loại vé                       | 🟢 Thấp       |
+| **Analytics dashboard**    | Biểu đồ doanh thu, tỷ lệ chuyển đổi, peak traffic — giúp BTC ra quyết định       | 🟢 Thấp       |
+
+### 8. Chất lượng code (Code Quality) 🧹
+
+- **Magic numbers → Config**: Các giá trị `300` (giây), `10` (vé tối đa), `2000` (SSE interval) nên đưa vào file config/constants.
+- **TypeScript strict consistency**: Thống nhất dùng `interface` vs `type`, tránh inline type.
+- **API versioning**: Thêm prefix `/api/v1/` để tương thích ngược khi nâng cấp.
+- **Storybook**: Tài liệu hoá component UI bằng Storybook — tiện review và test visual.
+- **Env validation**: Validate biến môi trường (`VITE_API_URL`, `DATABASE_URL`) lúc khởi động bằng Zod — fail fast nếu thiếu.

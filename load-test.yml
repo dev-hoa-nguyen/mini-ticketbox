@@ -1,0 +1,169 @@
+# =============================================================================
+# 🎟️ Mini Ticketbox — Load / Stress Test (Artillery)
+# =============================================================================
+# Mô phỏng ~5.000 người tranh mua 500 vé:
+#   - Warm-up → Ramp-up → Spike (peak) → Sustained
+#   - 3 kịch bản: mua 1 loại, mua nhiều loại, full flow (hold → pay)
+#
+# Cách chạy:
+#   npx artillery run load-test.yml
+#   npx artillery run load-test.yml --output report.json
+#
+# Yêu cầu: backend phải chạy tại http://localhost:8080
+#           và đã seed 500 vé (docker compose up --build)
+# =============================================================================
+
+config:
+  target: "http://localhost:8080"
+
+  # ── Các pha tải ──────────────────────────────────────────────────────────
+  phases:
+    # Pha 1: Khởi động nhẹ — kiểm tra hệ thống phản hồi bình thường
+    - name: "🟢 Warm-up"
+      duration: 5
+      arrivalRate: 10
+
+    # Pha 2: Tăng dần — mô phỏng user bắt đầu đổ vào
+    - name: "🟡 Ramp-up"
+      duration: 10
+      arrivalRate: 10
+      rampTo: 200
+
+    # Pha 3: Spike — cổng mở bán, ~5.000 user đồng thời tranh vé
+    - name: "🔴 Spike — Peak load"
+      duration: 10
+      arrivalRate: 500
+
+    # Pha 4: Kéo dài — người dùng vẫn tiếp tục cố mua sau khi vé gần hết
+    - name: "🟠 Sustained tail"
+      duration: 10
+      arrivalRate: 100
+
+  # ── Cài đặt chung ────────────────────────────────────────────────────────
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+  # ── Plugin thu thập metrics ──────────────────────────────────────────────
+  plugins:
+    expect: {}
+
+  # ── Ngưỡng hiệu năng (fail CI nếu vượt) ─────────────────────────────────
+  ensure:
+    thresholds:
+      - http.response_time.p99: 3000 # p99 < 3s
+      - http.response_time.p95: 2000 # p95 < 2s
+    conditions:
+      - expression: "http.codes.500 == 0"
+        strict: false # Cảnh báo nếu có 500 (không fail cứng)
+
+  # ── Payload sinh email ngẫu nhiên ────────────────────────────────────────
+  variables:
+    ticketTypes:
+      - "TIER S - ZONE A"
+      - "TIER A - ZONE B"
+
+# =============================================================================
+# Kịch bản test
+# =============================================================================
+scenarios:
+  # ── Kịch bản 1 (50%): Mua 1 loại vé ────────────────────────────────────
+  # Phổ biến nhất: user chọn 1 loại, mua 1-3 vé.
+  - name: "Mua 1 loại vé (1-3 vé)"
+    weight: 50
+    flow:
+      # Bước 1: Xem danh sách loại vé (như user mở trang)
+      - get:
+          url: "/api/tickets/types"
+          expect:
+            - statusCode: 200
+
+      # Bước 2: Đặt vé
+      - post:
+          url: "/api/tickets/hold"
+          json:
+            email: "user-{{ $uuid }}@loadtest.local"
+            items:
+              - type: "TIER S - ZONE A"
+                quantity: 2
+          capture:
+            - json: "$.data.order.id"
+              as: "orderId"
+          expect:
+            - statusCode:
+                - 200 # Giữ vé thành công
+                - 409 # Hết vé (expected khi vé cạn)
+                - 400 # Lỗi validate
+
+  # ── Kịch bản 2 (30%): Mua nhiều loại vé ─────────────────────────────────
+  # User mua cả 2 loại vé — test luồng all-or-nothing của Lua script.
+  - name: "Mua nhiều loại vé (combo)"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/tickets/types"
+          expect:
+            - statusCode: 200
+
+      - post:
+          url: "/api/tickets/hold"
+          json:
+            email: "combo-{{ $uuid }}@loadtest.local"
+            name: "Load Tester"
+            items:
+              - type: "TIER S - ZONE A"
+                quantity: 1
+              - type: "TIER A - ZONE B"
+                quantity: 2
+          capture:
+            - json: "$.data.order.id"
+              as: "orderId"
+          expect:
+            - statusCode:
+                - 200
+                - 409
+                - 400
+
+  # ── Kịch bản 3 (20%): Full flow — Hold → Pay ────────────────────────────
+  # Mô phỏng user hoàn tất: giữ vé → thanh toán ngay.
+  - name: "Full flow: hold → thanh toán"
+    weight: 20
+    flow:
+      # Bước 1: Xem loại vé
+      - get:
+          url: "/api/tickets/types"
+          expect:
+            - statusCode: 200
+
+      # Bước 2: Giữ vé
+      - post:
+          url: "/api/tickets/hold"
+          json:
+            email: "fullflow-{{ $uuid }}@loadtest.local"
+            items:
+              - type: "TIER A - ZONE B"
+                quantity: 1
+          capture:
+            - json: "$.data.order.id"
+              as: "orderId"
+            - json: "$.success"
+              as: "holdSuccess"
+          expect:
+            - statusCode:
+                - 200
+                - 409
+
+      # Bước 3: Thanh toán (chỉ khi giữ vé thành công)
+      - think: 1 # Giả lập user đọc thông tin 1 giây trước khi thanh toán
+
+      - ifTrue: "orderId"
+        post:
+          url: "/api/tickets/pay"
+          json:
+            orderId: "{{ orderId }}"
+          expect:
+            - statusCode:
+                - 200 # Thanh toán thành công
+                - 404 # Đơn không tồn tại
+                - 409 # Đã thanh toán / hết hạn
+                - 410 # Đơn hết hạn
