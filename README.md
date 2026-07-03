@@ -267,7 +267,7 @@ cd frontend && npx vitest run  # Vitest — khôi phục phiên giữ vé sau F5
 
 > Để có thể đưa hệ thống từ **bài test** lên **production-ready**, ta cần cải thiện và phát triển thêm các hạng mục sau:
 
-### 1. Bảo mật (Security) 🔒
+### Bảo mật (Security) 🔒
 
 | Hạng mục                  | Hiện trạng                                                                       | Đề xuất                                                                                            |
 | ------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -278,7 +278,7 @@ cd frontend && npx vitest run  # Vitest — khôi phục phiên giữ vé sau F5
 | **Idempotency Key**       | Không có — request retry (mất mạng) có thể tạo trùng đơn                         | Hỗ trợ header `Idempotency-Key` cho các endpoint mutating                                          |
 | **Xác minh đơn hàng**     | `POST /pay` chỉ kiểm `orderId`, ai biết UUID đều thanh toán được                 | Liên kết đơn với user (email/token) và xác minh quyền sở hữu                                       |
 
-### 2. Khả năng mở rộng (Scalability) 📈
+### Khả năng mở rộng (Scalability) 📈
 
 | Hạng mục                   | Hiện trạng                                                                                  | Đề xuất                                                                                               |
 | -------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -288,7 +288,7 @@ cd frontend && npx vitest run  # Vitest — khôi phục phiên giữ vé sau F5
 | **Reconciliation job**     | Nếu worker bị ngắt kết nối lúc key expired → vé kẹt HOLD mãi mãi                            | Thêm cronjob quét `orders WHERE status='PENDING' AND expiresAt < NOW()` để dọn vé bị kẹt              |
 | **Prisma connection pool** | Dùng cấu hình connection pool mặc định                                                      | Tuning `connection_limit` cho Prisma phù hợp với spike traffic 5.000 concurrent users                 |
 
-### 3. Hệ thống giám sát (Observability) 🔍
+### Hệ thống giám sát (Observability) 🔍
 
 - **Structured Logging**: Thay `console.log` bằng **Pino** hoặc **Winston** — có log level, timestamp, request correlation ID.
 - **Request Tracing**: Gắn `X-Request-Id` cho mỗi request, truyền xuyên suốt service → dễ debug trong production.
@@ -296,7 +296,7 @@ cd frontend && npx vitest run  # Vitest — khôi phục phiên giữ vé sau F5
 - **Health check nâng cao**: Endpoint `/health` hiện chỉ trả `{ status: "ok" }` — nên kiểm tra cả kết nối Redis và PostgreSQL (readiness probe).
 - **Dead Letter Queue**: Log lại các thao tác thất bại (DB write sau Redis hold) vào DLQ để retry hoặc alert.
 
-### 4. Giao diện & Trải nghiệm người dùng (Frontend UX) 🎨
+### Giao diện & Trải nghiệm người dùng (Frontend UX) 🎨
 
 | Hạng mục                   | Đề xuất                                                                                                              |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -312,7 +312,7 @@ cd frontend && npx vitest run  # Vitest — khôi phục phiên giữ vé sau F5
 | **Multi-tab sync**         | Mở nhiều tab có thể gây xung đột (1 tab thanh toán, tab khác vẫn hiện bước giữ)                                      | Dùng `BroadcastChannel` hoặc `storage` event để đồng bộ state giữa các tab                |
 | **Tách component lớn**     | `TicketCart` (394 dòng) quá lớn, khó bảo trì                                                                         | Tách thành `TicketTypeCard`, `CartSidebar`, `MobileBottomBar`                             |
 
-### 5. Accessibility (a11y) ♿
+### Accessibility (a11y) ♿
 
 - **ARIA labels**: Thêm `aria-label` cho các nút tương tác, input, và các phần tử icon-only.
 - **Keyboard navigation**: Đảm bảo toàn bộ luồng đặt vé có thể thao tác bằng bàn phím (Tab, Enter, Escape).
@@ -321,7 +321,7 @@ cd frontend && npx vitest run  # Vitest — khôi phục phiên giữ vé sau F5
 - **Skip-to-content link**: Thêm link "Bỏ qua menu" cho người dùng screen reader.
 - **Color contrast**: Kiểm tra WCAG AA cho gradient text, badge, và các phần tử nhỏ.
 
-### 6. Kiểm thử (Testing) 🧪
+### Kiểm thử (Testing) 🧪
 
 | Loại                | Hiện trạng                                    | Đề xuất                                                                                     |
 | ------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -331,7 +331,7 @@ cd frontend && npx vitest run  # Vitest — khôi phục phiên giữ vé sau F5
 | **E2E**             | Không có                                      | Thêm Playwright/Cypress cho luồng đặt vé end-to-end (chọn → giữ → thanh toán → hết hạn)     |
 | **Lua Script**      | Chỉ test gián tiếp qua service mock           | Test trực tiếp Lua script với Redis thật                                                    |
 
-### 7. Tính năng đề xuất 🚀
+### Tính năng đề xuất 🚀
 
 | Tính năng                  | Mô tả                                                                            | Độ ưu tiên    |
 | -------------------------- | -------------------------------------------------------------------------------- | ------------- |

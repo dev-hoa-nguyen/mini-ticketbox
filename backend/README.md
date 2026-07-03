@@ -123,5 +123,3 @@ npx artillery run load-test.yml -o report.json
 ```
 
 Kết quả kỳ vọng: Dù có 5.000 request được gửi đi, sẽ chỉ có đúng 500 request trả về HTTP 200 (Thành công), 4.500 request còn lại sẽ bị Redis chặn lại và trả về HTTP 400 (Hết vé). Hệ thống PostgreSQL không hề bị quá tải.
-
-(Lưu ý: Hãy chụp ảnh biểu đồ kết quả load test và chèn vào đây trước khi nộp bài)
